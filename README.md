@@ -53,12 +53,3 @@ Backups are encrypted using AES-256-CBC via OpenSSL. Ensure you keep the encrypt
 
 Contributions to this script are welcome. Please fork the repository, make your changes, and submit a pull request.
 
----
-
-### Additional Notes
-
-- This README assumes that your script is named `backup.sh`. Adjust the filename as necessary.
-- Adjust the paths and example commands based on your environment or typical use cases.
-- If your script or its environment has other dependencies or considerations (like specific versions of software), be sure to include those in the "Requirements" section.
-
-Markdown format allows for easy reading both directly on platforms like GitHub and when rendered on websites. Adjust the content as necessary to fit your project's specifics and user needs.
