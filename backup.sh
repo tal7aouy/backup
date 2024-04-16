@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Bash options for safety
+set -o errexit
+set -o nounset
+set -o pipefail
+
 # ANSI color codes
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -12,19 +17,24 @@ SOURCE_DIRS=""
 BACKUP_ROOT_DIR=""
 LOG_FILE="$(pwd)/backup.log" # Default log file location
 
-# Print messages with timestamp
-log_message() {
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+# Enhanced logging functions
+log_info() {
+    echo -e "${GREEN}$(date '+%Y-%m-%d %H:%M:%S') - INFO - $1${NC}" | tee -a "$LOG_FILE"
 }
 
-# Display usage information and log it with colors
+log_error() {
+    echo -e "${RED}$(date '+%Y-%m-%d %H:%M:%S') - ERROR - $1${NC}" | tee -a "$LOG_FILE"
+    exit 1
+}
+
+# Display usage information and exit
 usage() {
-    log_message "${RED}Usage: $0 -e <encryption_password> -r <source_dir1,source_dir2,...> -d <backup_root_dir> [-l <log_file>]${NC}"
-    log_message "Options:"
-    log_message "  ${GREEN}-e    Encryption password for securing backup files.${NC}"
-    log_message "  ${GREEN}-r    Comma-separated list of directories or files to backup.${NC}"
-    log_message "  ${GREEN}-d    Destination directory for storing backup files.${NC}"
-    log_message "  ${YELLOW}-l    Optional: Log file location. Default is ./backup.log.${NC}"
+    log_info "${RED}Usage: $0 -e <encryption_password> -r <source_dir1,source_dir2,...> -d <backup_root_dir> [-l <log_file>]${NC}"
+    log_info "Options:"
+    log_info "  ${GREEN}-e    Encryption password for securing backup files.${NC}"
+    log_info "  ${GREEN}-r    Comma-separated list of directories or files to backup.${NC}"
+    log_info "  ${GREEN}-d    Destination directory for storing backup files.${NC}"
+    log_info "  ${YELLOW}-l    Optional: Log file location. Default is ./backup.log.${NC}"
     exit 1
 }
 
@@ -49,11 +59,16 @@ while getopts "e:r:d:l:" opt; do
     esac
 done
 
-# Validate required options and log it
-if [ -z "${ENCRYPTION_PASSWORD}" ] || [ -z "${SOURCE_DIRS}" ] || [ -z "${BACKUP_ROOT_DIR}" ]; then
-    echo -e "${RED}2024-04-10 03:13:38 - Error: All options -e, -r, and -d are required.${NC}"
-    usage
-fi
+# Validate required options
+[ -z "${ENCRYPTION_PASSWORD}" ] && log_error "Encryption password not set."
+[ -z "${SOURCE_DIRS}" ] || [ -z "${BACKUP_ROOT_DIR}" ] && log_error "Source directories or backup root directory not set."
+
+# Validate environment
+for dir in "${SOURCE_ARRAY[@]}"; do
+    [ ! -d "$dir" ] && log_error "Directory $dir does not exist."
+    [ ! -r "$dir" ] && log_error "Directory $dir is not readable."
+done
+[ ! -w "${BACKUP_ROOT_DIR}" ] && log_error "Backup root directory is not writable."
 
 # Configuration for backup
 DB_USER="root"
@@ -65,19 +80,19 @@ SERVER_BACKUP_FILE="${BACKUP_ROOT_DIR}/server-backup-${DATE}.tar.gz.enc"
 DATABASE_BACKUP_FILE="${DB_BACKUP_DIR}/db-backup-${DATE}.sql.gz.enc"
 
 # Perform server backup and encrypt
-log_message "Starting server data backup..."
+log_info "Starting server data backup..."
 if tar -czf - "${SOURCE_ARRAY[@]}" | openssl enc -aes-256-cbc -salt -out "${SERVER_BACKUP_FILE}" -pass pass:"${ENCRYPTION_PASSWORD}"; then
-    log_message "Server data backup completed: ${SERVER_BACKUP_FILE}"
+    log_info "Server data backup completed: ${SERVER_BACKUP_FILE}"
 else
-    log_message "Error during server data backup."
+    log_error "Error during server data backup."
 fi
 
 # Perform database backup, compress, and encrypt
-log_message "Starting database backup..."
+log_info "Starting database backup..."
 if mysqldump -u "${DB_USER}" -p"${DB_PASSWORD}" "${DB_NAME}" | gzip | openssl enc -aes-256-cbc -salt -out "${DATABASE_BACKUP_FILE}" -pass pass:"${ENCRYPTION_PASSWORD}"; then
-    log_message "Database backup completed: ${DATABASE_BACKUP_FILE}"
+    log_info "Database backup completed: ${DATABASE_BACKUP_FILE}"
 else
-    log_message "Error during database backup."
+    log_error "Error during database backup."
 fi
 
-log_message "Backup process completed successfully."
+log_info "Backup process completed successfully."
