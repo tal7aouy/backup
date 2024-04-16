@@ -11,11 +11,13 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Initialize variables
-ENCRYPTION_PASSWORD=""
-SOURCE_DIRS=""
-BACKUP_ROOT_DIR=""
-LOG_FILE="$(pwd)/backup.log" # Default log file location
+# Load configuration from the backup.conf file
+CONFIG_FILE="backup.conf"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo -e "${RED}Configuration file not found!${NC}"
+    exit 1
+fi
+source "$CONFIG_FILE"
 
 # Enhanced logging functions
 log_info() {
@@ -27,57 +29,18 @@ log_error() {
     exit 1
 }
 
-# Display usage information and exit
-usage() {
-    log_info "${RED}Usage: $0 -e <encryption_password> -r <source_dir1,source_dir2,...> -d <backup_root_dir> [-l <log_file>]${NC}"
-    log_info "Options:"
-    log_info "  ${GREEN}-e    Encryption password for securing backup files.${NC}"
-    log_info "  ${GREEN}-r    Comma-separated list of directories or files to backup.${NC}"
-    log_info "  ${GREEN}-d    Destination directory for storing backup files.${NC}"
-    log_info "  ${YELLOW}-l    Optional: Log file location. Default is ./backup.log.${NC}"
-    exit 1
-}
-
-# Parse command-line options
-while getopts "e:r:d:l:" opt; do
-    case "${opt}" in
-        e)
-            ENCRYPTION_PASSWORD="${OPTARG}"
-            ;;
-        r)
-            IFS=',' read -r -a SOURCE_ARRAY <<< "${OPTARG}"
-            ;;
-        d)
-            BACKUP_ROOT_DIR="${OPTARG}"
-            ;;
-        l)
-            LOG_FILE="${OPTARG}"
-            ;;
-        *)
-            usage
-            ;;
-    esac
-done
-
-# Validate required options
-[ -z "${ENCRYPTION_PASSWORD}" ] && log_error "Encryption password not set."
-[ -z "${SOURCE_DIRS}" ] || [ -z "${BACKUP_ROOT_DIR}" ] && log_error "Source directories or backup root directory not set."
-
-# Validate environment
+# Validate environment and input
+IFS=',' read -r -a SOURCE_ARRAY <<< "$SOURCE_DIRS"
 for dir in "${SOURCE_ARRAY[@]}"; do
     [ ! -d "$dir" ] && log_error "Directory $dir does not exist."
     [ ! -r "$dir" ] && log_error "Directory $dir is not readable."
 done
-[ ! -w "${BACKUP_ROOT_DIR}" ] && log_error "Backup root directory is not writable."
+[ ! -w "$BACKUP_ROOT_DIR" ] && log_error "Backup root directory is not writable."
 
-# Configuration for backup
-DB_USER="root"
-DB_PASSWORD="password"
-DB_NAME="maxmind_crm-cim-ori"
-DB_BACKUP_DIR="${BACKUP_ROOT_DIR}"
+# Backup file naming
 DATE=$(date +%Y-%m-%d-%H%M%S)
 SERVER_BACKUP_FILE="${BACKUP_ROOT_DIR}/server-backup-${DATE}.tar.gz.enc"
-DATABASE_BACKUP_FILE="${DB_BACKUP_DIR}/db-backup-${DATE}.sql.gz.enc"
+DATABASE_BACKUP_FILE="${BACKUP_ROOT_DIR}/db-backup-${DATE}.sql.gz.enc"
 
 # Perform server backup and encrypt
 log_info "Starting server data backup..."
